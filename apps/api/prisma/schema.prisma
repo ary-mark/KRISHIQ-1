@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+ datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+ }
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      Role
+  farmer    Farmer?
+  admin     Admin?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  FARMER
+  CENTRE_ADMIN
+  SYSTEM_ADMIN
+}
+
+model Farmer {
+  id          Int      @id @default(autoincrement())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      Int      @unique
+  name        String?
+  phoneNumber String   @unique
+  bookings    Booking[]
+  queueEntries QueueEntry[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Admin {
+  id          Int      @id @default(autoincrement())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      Int      @unique
+  centreId    Int?
+  centre      ProcurementCentre? @relation(fields: [centreId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProcurementCentre {
+  id          Int      @id @default(autoincrement())
+  name        String
+  address     String
+  latitude    Float
+  longitude   Float
+  capacity    Int
+  operatingHours CentreOperatingHours[]
+  crops       CentreCrop[]
+  bookings    Booking[]
+  queueEntries QueueEntry[]
+  admins      Admin[]
+  weatherRecords WeatherRecord[]
+  crowdPredictions CrowdPrediction[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CentreCrop {
+  centreId Int
+  cropId   Int
+  centre   ProcurementCentre @relation(fields: [centreId], references: [id])
+  crop     Crop               @relation(fields: [cropId], references: [id])
+  @@id([centreId, cropId])
+}
+
+model Crop {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  centres     CentreCrop[]
+  bookings    Booking[]
+  marketPrices MarketPrice[]
+}
+
+model Booking {
+  id               Int       @id @default(autoincrement())
+  farmerId         Int
+  centreId         Int
+  cropId           Int
+  quantity         Float
+  preferredDate    DateTime
+  status           BookingStatus @default(PENDING)
+  token            Token?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  farmer   Farmer   @relation(fields: [farmerId], references: [id])
+  centre   ProcurementCentre @relation(fields: [centreId], references: [id])
+  crop     Crop     @relation(fields: [cropId], references: [id])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Token {
+  id          Int    @id @default(autoincrement())
+  code        String @unique
+  bookingId   Int    @unique
+  position    Int
+  status      TokenStatus @default(WAITING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+  queueEntries QueueEntry[]
+}
+
+enum TokenStatus {
+  WAITING
+  CALLED
+  COMPLETED
+  CANCELLED
+}
+
+model QueueEntry {
+  id          Int      @id @default(autoincrement())
+  centreId    Int
+  tokenId     Int
+  farmerId    Int
+  status      QueueStatus @default(WAITING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  centre  ProcurementCentre @relation(fields: [centreId], references: [id])
+  token   Token   @relation(fields: [tokenId], references: [id])
+  farmer  Farmer  @relation(fields: [farmerId], references: [id])
+}
+
+enum QueueStatus {
+  WAITING
+  IN_PROCESS
+  COMPLETED
+  CANCELLED
+}
+
+model MarketPrice {
+  id          Int      @id @default(autoincrement())
+  cropId      Int
+  market      String
+  minPrice    Float
+  maxPrice    Float
+  avgPrice    Float
+  updatedAt   DateTime @default(now())
+
+  crop Crop @relation(fields: [cropId], references: [id])
+}
+
+model WeatherRecord {
+  id          Int      @id @default(autoincrement())
+  centreId    Int?
+  temperature Float
+  humidity    Float
+  windSpeed   Float
+  condition   String
+  forecastAt  DateTime @default(now())
+
+  centre ProcurementCentre? @relation(fields: [centreId], references: [id])
+}
+
+model CrowdPrediction {
+  id          Int      @id @default(autoincrement())
+  centreId    Int
+  predictedAt DateTime @default(now())
+  expectedCrowd Int
+
+  centre ProcurementCentre @relation(fields: [centreId], references: [id])
+}
+
+model CentreOperatingHours {
+  id        Int    @id @default(autoincrement())
+  centreId  Int
+  dayOfWeek Int   // 0=Sunday ... 6=Saturday
+  openTime  String // e.g., "08:00"
+  closeTime String // e.g., "18:00"
+
+  centre ProcurementCentre @relation(fields: [centreId], references: [id])
+}
+
